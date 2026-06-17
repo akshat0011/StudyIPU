@@ -10,6 +10,25 @@ const PORT = 3000;
 // lets the server read JSON sent in a request's body
 app.use(express.json());
 
+// gate: only lets a request through if it carries a valid token
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "You must be logged in." });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = payload;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid or expired token." });
+  }
+}
+
 app.get("/", (req, res) => {
   res.send("Hello from the StudyIPU backend!");
 });
@@ -70,6 +89,15 @@ app.post("/login", (req, res) => {
     token: token,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
   });
+});
+
+// protected: returns the logged-in user's own profile
+app.get("/me", requireAuth, (req, res) => {
+  const user = db
+    .prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?")
+    .get(req.user.userId);
+
+  res.json({ user });
 });
 
 app.listen(PORT, () => {
