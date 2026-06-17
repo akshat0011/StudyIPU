@@ -1,12 +1,42 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; // CHANGED: also import useEffect
 
 function App() {
-  const [user, setUser] = useState(null); // null = nobody logged in
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true); // NEW: true while we check the saved token on load
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+
+  // NEW: runs once when the page loads — if a token is saved, fetch the user's profile
+  useEffect(() => {
+    async function loadUser() {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:3000/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error("Invalid token");
+
+        const data = await response.json();
+        setUser(data.user);
+      } catch (err) {
+        localStorage.removeItem("token"); // token was bad or expired — drop it
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadUser();
+  }, []);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -37,7 +67,7 @@ function App() {
         setMode("login");
       } else {
         localStorage.setItem("token", data.token);
-        setUser(data.user); // switch to the logged-in view
+        setUser(data.user);
       }
     } catch (err) {
       setMessage("Could not reach the server. Is it running?");
@@ -49,7 +79,11 @@ function App() {
     setUser(null);
   }
 
-  // logged in → show the dashboard instead of the form
+  // NEW: while we're still checking the saved token, don't flash the form
+  if (loading) {
+    return <p>Loading...</p>;
+  }
+
   if (user) {
     return (
       <div>
@@ -63,7 +97,6 @@ function App() {
     );
   }
 
-  // not logged in → show the login / signup form
   return (
     <div>
       <h1>StudyIPU</h1>
