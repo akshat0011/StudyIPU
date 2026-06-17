@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react"; // CHANGED: also import useEffect
+import { Routes, Route, Link } from "react-router"; // NEW
+import MaterialsPage from "./MaterialsPage"; // NEW
 
 function App() {
   const [user, setUser] = useState(null);
@@ -84,15 +86,30 @@ function App() {
     return <p>Loading...</p>;
   }
 
-  if (user) {
+if (user) {
     return (
       <div>
         <h1>StudyIPU</h1>
-        <p>Welcome, {user.name}!</p>
-        <p>
-          Logged in as {user.email} ({user.role}).
-        </p>
-        <button onClick={handleLogout}>Log out</button>
+
+        {/* NEW: navigation bar, stays on screen across pages */}
+        <nav>
+          <Link to="/">Home</Link> | <Link to="/materials">Materials</Link>
+          {" | "}
+          <button onClick={handleLogout}>Log out</button>
+        </nav>
+
+        {/* NEW: which page shows depends on the URL */}
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <p>
+                Welcome, {user.name}! Logged in as {user.email} ({user.role}).
+              </p>
+            }
+          />
+          <Route path="/materials" element={<MaterialsPage />} />
+        </Routes>
       </div>
     );
   }
