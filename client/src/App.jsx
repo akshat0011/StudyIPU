@@ -1,7 +1,8 @@
 import { useState } from "react";
 
 function App() {
-  const [mode, setMode] = useState("login"); // "login" or "signup"
+  const [user, setUser] = useState(null); // null = nobody logged in
+  const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +16,6 @@ function App() {
       mode === "signup"
         ? "http://localhost:3000/signup"
         : "http://localhost:3000/login";
-
     const body =
       mode === "signup" ? { name, email, password } : { email, password };
 
@@ -25,7 +25,6 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
       const data = await response.json();
 
       if (!response.ok) {
@@ -38,13 +37,33 @@ function App() {
         setMode("login");
       } else {
         localStorage.setItem("token", data.token);
-        setMessage(`Logged in as ${data.user.name}!`);
+        setUser(data.user); // switch to the logged-in view
       }
     } catch (err) {
       setMessage("Could not reach the server. Is it running?");
     }
   }
 
+  function handleLogout() {
+    localStorage.removeItem("token");
+    setUser(null);
+  }
+
+  // logged in → show the dashboard instead of the form
+  if (user) {
+    return (
+      <div>
+        <h1>StudyIPU</h1>
+        <p>Welcome, {user.name}!</p>
+        <p>
+          Logged in as {user.email} ({user.role}).
+        </p>
+        <button onClick={handleLogout}>Log out</button>
+      </div>
+    );
+  }
+
+  // not logged in → show the login / signup form
   return (
     <div>
       <h1>StudyIPU</h1>
