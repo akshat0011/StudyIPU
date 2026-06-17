@@ -108,7 +108,7 @@ if (user) {
               </p>
             }
           />
-          <Route path="/materials" element={<MaterialsPage />} />
+          <Route path="/materials" element={<MaterialsPage user={user} />} />  {/* CHANGED: pass user */}
         </Routes>
       </div>
     );
