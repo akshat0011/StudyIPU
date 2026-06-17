@@ -103,6 +103,35 @@ app.get("/me", requireAuth, (req, res) => {
   res.json({ user });
 });
 
+// NEW: list all study materials (must be logged in)
+app.get("/materials", requireAuth, (req, res) => {
+  const materials = db
+    .prepare("SELECT * FROM materials ORDER BY created_at DESC")
+    .all();
+  res.json({ materials });
+});
+
+// NEW: add a new study material (must be logged in)
+app.post("/materials", requireAuth, (req, res) => {
+  const { title, subject, type, url } = req.body;
+
+  if (!title || !subject || !url) {
+    return res
+      .status(400)
+      .json({ error: "Title, subject, and url are required." });
+  }
+
+  const result = db
+    .prepare(
+      "INSERT INTO materials (title, subject, type, url, uploaded_by) VALUES (?, ?, ?, ?, ?)"
+    )
+    .run(title, subject, type || "notes", url, req.user.userId);
+
+  res
+    .status(201)
+    .json({ message: "Material added!", id: result.lastInsertRowid });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

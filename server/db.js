@@ -15,4 +15,18 @@ db.prepare(`
 
 console.log("Database ready, users table is set up.");
 
+// NEW: table for study materials, PYQs, and playlists
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS materials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'notes',
+    url TEXT NOT NULL,
+    uploaded_by INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )
+`).run();
+
+
 module.exports = db;
