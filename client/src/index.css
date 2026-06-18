@@ -1,13 +1,27 @@
 :root {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-2: #273449;
-  --border: #334155;
-  --text: #f1f5f9;
-  --text-muted: #94a3b8;
+  --bg: #0a0a0a;
+  --surface: #161616;
+  --surface-2: #232323;
+  --border: #2a2a2a;
+  --text: #fafafa;
+  --text-muted: #a3a3a3;
   --accent: #2dd4bf;
   --accent-hover: #5eead4;
   --accent-ink: #052e2b;
+  --navbar-bg: rgba(10, 10, 10, 0.8);
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --surface-2: #f0f0f1;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --text-muted: #71717a;
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-ink: #ffffff;
+  --navbar-bg: rgba(255, 255, 255, 0.8);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,7 +46,7 @@ a { color: var(--text); text-decoration: none; }
   position: sticky;
   top: 0;
   z-index: 10;
-  background-color: rgba(15, 23, 42, 0.85);
+  background-color: var(--navbar-bg);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
@@ -197,4 +211,24 @@ button:hover { background-color: var(--accent-hover); }
 .link-button:hover { background: none; color: var(--accent-hover); }
 
 /* Logo */
-.logo-img { height: 38px; display: block; }
+.logo-img { height: 82px; display: block; }
+
+body, .navbar, .auth-card, input, button, .nav-login {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Toggle button styling */
+
+.theme-toggle {
+  width: auto;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.theme-toggle:hover { background-color: var(--surface-2); }
