@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import usictImage from "./assets/usict.webp";
 
 const sections = [
   {
@@ -62,6 +63,30 @@ function HomePage() {
             <p>{section.desc}</p>
           </Link>
         ))}
+      </section>
+
+      <section className="about">
+        <div className="about-text">
+          <h2>Built by students who've been there</h2>
+          <p>
+            Finding good notes, last year's papers, and the right lectures for USICT
+            usually means digging through scattered WhatsApp groups and seniors' Drive
+            links. StudyUSICT puts it all in one place — sorted by branch and semester,
+            and free for everyone.
+          </p>
+          <p>
+            We also track off-campus internships and job openings, because building
+            your career shouldn't wait until final year.
+          </p>
+          <ul className="about-points">
+            <li>Free forever — no paywalls, no login needed to browse</li>
+            <li>Every branch and every semester at USICT</li>
+            <li>Notes, PYQs, video lectures, and jobs in one hub</li>
+          </ul>
+        </div>
+        <div className="about-image">
+          <img src={usictImage} alt="USICT" /> {/* CHANGED: was the Unsplash URL */}
+        </div>
       </section>
     </div>
   );

@@ -4,6 +4,7 @@ import Logo from "./Logo";
 import HomePage from "./HomePage";
 import LoginPage from "./LoginPage";
 import MaterialsPage from "./MaterialsPage";
+import Footer from "./Footer";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -83,6 +84,7 @@ function App() {
         <Route path="/login" element={<LoginPage onLogin={setUser} />} />
         <Route path="/materials" element={<MaterialsPage user={user} />} />
       </Routes>
+      <Footer />
     </div>
   );
 }

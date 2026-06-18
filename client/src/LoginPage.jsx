@@ -49,33 +49,35 @@ function LoginPage({ onLogin }) {
   return (
     <div className="auth-wrapper">
       <div className="auth-card">
-        <h2>{mode === "signup" ? "Create your account" : "Welcome back"}</h2>
+        <div className="auth-fields" key={mode}>
+          <h2>{mode === "signup" ? "Create your account" : "Welcome back"}</h2>
 
-        <form onSubmit={handleSubmit}>
-          {mode === "signup" && (
+          <form onSubmit={handleSubmit}>
+            {mode === "signup" && (
+              <input
+                type="text"
+                placeholder="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            )}
             <input
-              type="text"
-              placeholder="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button type="submit">{mode === "signup" ? "Sign up" : "Log in"}</button>
-        </form>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button type="submit">{mode === "signup" ? "Sign up" : "Log in"}</button>
+          </form>
 
-        <p className="auth-message">{message}</p>
+          <p className="auth-message">{message}</p>
+        </div>
 
         <button
           className="link-button"
