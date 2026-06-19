@@ -136,6 +136,26 @@ function ResourceHubPage({ user }) {
     }
   }
 
+async function handleDelete(id) {
+    const confirmed = window.confirm("Remove this resource? This can't be undone.");
+    if (!confirmed) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://localhost:3000/materials/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || `Couldn't delete (server responded ${res.status}). Make sure the delete route is added in server/index.js and you restarted the backend.`);
+        return;
+      }
+      setMaterials((prev) => prev.filter((m) => m.id !== id));
+    } catch (err) {
+      alert("Couldn't reach the backend — is it running?");
+    }
+  }
+
   return (
     <div className="page">
       <div className="hub-filter">
@@ -241,19 +261,29 @@ function ResourceHubPage({ user }) {
               ) : (
                 <div className="resource-list">
                   {tabMaterials.map((m) => (
-                    <a
-                      key={m.id}
-                      href={m.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="resource-row"
-                    >
-                      <div className="resource-info">
-                        <span className="resource-title">{m.title}</span>
-                        <span className="resource-url">{m.url}</span>
-                      </div>
-                      <span className="resource-open">Open ↗</span>
-                    </a>
+                    <div className="resource-row" key={m.id}>
+                      <a
+                        href={m.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="resource-link"
+                      >
+                        <div className="resource-info">
+                          <span className="resource-title">{m.title}</span>
+                          <span className="resource-url">{m.url}</span>
+                        </div>
+                        <span className="resource-open">Open ↗</span>
+                      </a>
+                      {user?.role === "admin" && (
+                        <button
+                          className="resource-delete"
+                          onClick={() => handleDelete(m.id)}
+                          title="Remove resource"
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
