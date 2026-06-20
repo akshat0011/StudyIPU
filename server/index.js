@@ -42,6 +42,8 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
+  console.log("Health check:", new Date().toISOString());
+
   res.status(200).json({
     status: "ok",
     uptime: process.uptime()
