@@ -1302,3 +1302,81 @@ body * {
 }
 .password-toggle:hover { color: var(--text); }
 .password-toggle svg { width: 18px; height: 18px; }
+
+/* animate the top-bar login & logout buttons */
+.login-link, .logout-btn {
+  transition: transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.login-link:hover, .logout-btn:hover { transform: translateY(-2px); }
+.login-link:active, .logout-btn:active { transform: translateY(0); }
+
+/* ===== About page ===== */
+.about-hero {
+  background-color: var(--navy);
+  color: #fff;
+  border-radius: 20px;
+  padding: 3rem;
+  margin-bottom: 2rem;
+}
+.about-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  margin-bottom: 1.25rem;
+}
+.about-hero-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 1rem;
+  max-width: 22ch;
+}
+.about-hero-text {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 60ch;
+}
+.about-body { display: flex; flex-direction: column; gap: 2rem; }
+.about-h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 0.85rem; }
+.about-block p {
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin-bottom: 0.85rem;
+  max-width: 70ch;
+}
+.about-block p strong { color: var(--text); }
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+.contact-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background-color: var(--surface);
+  text-decoration: none;
+  color: var(--text);
+  transition: transform 0.18s ease, border-color 0.2s ease;
+}
+.contact-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+.contact-card svg { width: 26px; height: 26px; color: var(--accent); flex-shrink: 0; }
+.contact-card > div { display: flex; flex-direction: column; }
+.contact-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.contact-value { font-weight: 600; font-size: 0.95rem; }
