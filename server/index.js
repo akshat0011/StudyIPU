@@ -41,6 +41,13 @@ app.get("/", (req, res) => {
   res.send("Hello from the StudyUSICT backend!");
 });
 
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    uptime: process.uptime()
+  });
+});
+
 // create a new account
 app.post("/signup", async (req, res) => {
   const { name, email, password } = req.body;
