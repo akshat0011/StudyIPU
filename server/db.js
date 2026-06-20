@@ -1,49 +1,56 @@
-const Database = require("better-sqlite3");
+require("dotenv").config();
+const { Pool } = require("pg");
 
-const db = new Database("college.db");
 
-db.prepare(`
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, 
+  ssl: { rejectUnauthorized: false },         // Neon only accepts encrypted (SSL) connections
+});
+
+
+async function initDb() {
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'student',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-)
-`).run();
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'student',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
 
-console.log("Database ready, users table is set up.");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS materials (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'notes',
+      url TEXT NOT NULL,
+      uploaded_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
 
-// NEW: table for study materials, PYQs, and playlists
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS materials (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    type TEXT NOT NULL DEFAULT 'notes',
-    url TEXT NOT NULL,
-    uploaded_by INTEGER,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )
-`).run();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS jobs (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      company TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'fulltime',
+      description TEXT,
+      location TEXT,
+      salary TEXT,
+      url TEXT,
+      tags TEXT,
+      posted_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
 
-// New: table for jobs 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS jobs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    company TEXT NOT NULL,
-    type TEXT NOT NULL DEFAULT 'fulltime',
-    description TEXT,
-    location TEXT,
-    salary TEXT,
-    url TEXT,
-    tags TEXT,
-    posted_by INTEGER,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+  console.log("Database ready — users, materials, and jobs tables are set up.");
+}
 
+pool.initDb = initDb; // the server calls this on startup (see index.js)
 
-module.exports = db;
+module.exports = pool;

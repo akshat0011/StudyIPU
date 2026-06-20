@@ -1,5 +1,5 @@
 require("dotenv").config();
-const {OAuth2Client} = require("google-auth-library");
+const { OAuth2Client } = require("google-auth-library");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const express = require("express");
 const bcrypt = require("bcryptjs");
@@ -11,20 +11,15 @@ const app = express();
 const PORT = 3000;
 
 app.use(cors());
-
-// lets the server read JSON sent in a request's body
 app.use(express.json());
 
 // gate: only lets a request through if it carries a valid token
 function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
-
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "You must be logged in." });
   }
-
   const token = authHeader.split(" ")[1];
-
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     req.user = payload;
@@ -34,7 +29,7 @@ function requireAuth(req, res, next) {
   }
 }
 
-// NEW: gate that only lets admins through (use it AFTER requireAuth)
+// gate that only lets admins through (use it AFTER requireAuth)
 function requireAdmin(req, res, next) {
   if (req.user.role !== "admin") {
     return res.status(403).json({ error: "Admins only." });
@@ -43,65 +38,57 @@ function requireAdmin(req, res, next) {
 }
 
 app.get("/", (req, res) => {
-  res.send("Hello from the StudyIPU backend!");
+  res.send("Hello from the StudyUSICT backend!");
 });
 
 // create a new account
-app.post("/signup", (req, res) => {
+app.post("/signup", async (req, res) => {
   const { name, email, password } = req.body;
-
   if (!name || !email || !password) {
-    return res
-      .status(400)
-      .json({ error: "Name, email, and password are all required." });
+    return res.status(400).json({ error: "Name, email, and password are all required." });
   }
-
   const hashedPassword = bcrypt.hashSync(password, 10);
-
   try {
-    const result = db
-      .prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)")
-      .run(name, email, hashedPassword);
-
-    res.status(201).json({
-      message: "Account created successfully!",
-      userId: result.lastInsertRowid,
-    });
+    const result = await db.query(
+      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id",
+      [name, email, hashedPassword]
+    );
+    res.status(201).json({ message: "Account created successfully!", userId: result.rows[0].id });
   } catch (err) {
-    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
-      return res
-        .status(409)
-        .json({ error: "An account with that email already exists." });
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "An account with that email already exists." });
     }
+    console.error(err);
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
 // log in to an existing account
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
   const { email, password } = req.body;
-
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required." });
   }
-
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-
-  if (!user || !bcrypt.compareSync(password, user.password)) {
-    return res.status(401).json({ error: "Invalid email or password." });
+  try {
+    const result = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+    const user = result.rows[0];
+    if (!user || !bcrypt.compareSync(password, user.password)) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.json({
+      message: "Logged in successfully!",
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Something went wrong. Please try again." });
   }
-
-  const token = jwt.sign(
-    { userId: user.id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-
-  res.json({
-    message: "Logged in successfully!",
-    token: token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
-  });
 });
 
 app.post("/auth/google", async (req, res) => {
@@ -109,9 +96,7 @@ app.post("/auth/google", async (req, res) => {
   if (!credential) {
     return res.status(400).json({ error: "Missing Google credential." });
   }
-
   try {
-    // Ask Google to confirm this token is genuine and meant for our app
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -120,24 +105,22 @@ app.post("/auth/google", async (req, res) => {
     const email = profile.email;
     const name = profile.name || email.split("@")[0];
 
-    // Find an existing account for this email...
-    let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    const found = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+    let user = found.rows[0];
 
-    // ...or create a new student account (no password — they'll use Google)
     if (!user) {
-      const result = db
-        .prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)")
-        .run(name, email, "google-oauth", "student");
-      user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
+      const inserted = await db.query(
+        "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *",
+        [name, email, "google-oauth", "student"]
+      );
+      user = inserted.rows[0];
     }
 
-    // Issue OUR own token, exactly like a normal login does
     const token = jwt.sign(
       { userId: user.id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-
     res.json({
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
@@ -149,88 +132,112 @@ app.post("/auth/google", async (req, res) => {
 });
 
 // protected: returns the logged-in user's own profile
-app.get("/me", requireAuth, (req, res) => {
-  const user = db
-    .prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?")
-    .get(req.user.userId);
-
-  res.json({ user });
+app.get("/me", requireAuth, async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT id, name, email, role, created_at FROM users WHERE id = $1",
+      [req.user.userId]
+    );
+    res.json({ user: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Something went wrong." });
+  }
 });
 
-// NEW: list all study materials
-app.get("/materials", (req, res) => {
-  const materials = db
-    .prepare("SELECT * FROM materials ORDER BY created_at DESC")
-    .all();
-  res.json({ materials });
+// list all study materials (public)
+app.get("/materials", async (req, res) => {
+  try {
+    const result = await db.query("SELECT * FROM materials ORDER BY created_at DESC");
+    res.json({ materials: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Couldn't load materials." });
+  }
 });
 
-// NEW: add a new study material (must be logged in)
-app.post("/materials", requireAuth, requireAdmin, (req, res) => {
+// add a new study material (admin only)
+app.post("/materials", requireAuth, requireAdmin, async (req, res) => {
   const { title, subject, type, url } = req.body;
-
   if (!title || !subject || !url) {
-    return res
-      .status(400)
-      .json({ error: "Title, subject, and url are required." });
+    return res.status(400).json({ error: "Title, subject, and url are required." });
   }
-
-  const result = db
-    .prepare(
-      "INSERT INTO materials (title, subject, type, url, uploaded_by) VALUES (?, ?, ?, ?, ?)"
-    )
-    .run(title, subject, type || "notes", url, req.user.userId);
-
-  res
-    .status(201)
-    .json({ message: "Material added!", id: result.lastInsertRowid });
-});
-
-app.delete("/materials/:id", requireAuth, requireAdmin, (req, res) => {
-  const result = db.prepare("DELETE FROM materials WHERE id = ?").run(req.params.id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: "Material not found." });
+  try {
+    const result = await db.query(
+      "INSERT INTO materials (title, subject, type, url, uploaded_by) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+      [title, subject, type || "notes", url, req.user.userId]
+    );
+    res.status(201).json({ message: "Material added!", id: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Couldn't add material." });
   }
-  res.json({ success: true });
 });
 
-// All jobs (public)
-app.get("/jobs", (req, res) => {
-  const jobs = db.prepare("SELECT * FROM jobs ORDER BY created_at DESC").all();
-  res.json(jobs);
+// delete a study material (admin only)
+app.delete("/materials/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query("DELETE FROM materials WHERE id = $1", [req.params.id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Material not found." });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Couldn't delete material." });
+  }
 });
 
-// Post a job (admin only)
-app.post("/jobs", requireAuth, requireAdmin, (req, res) => {
+// all jobs (public)
+app.get("/jobs", async (req, res) => {
+  try {
+    const result = await db.query("SELECT * FROM jobs ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Couldn't load jobs." });
+  }
+});
+
+// post a job (admin only)
+app.post("/jobs", requireAuth, requireAdmin, async (req, res) => {
   const { title, company, type, description, location, salary, url, tags } = req.body;
   if (!title || !company) {
     return res.status(400).json({ error: "Title and company are required." });
   }
-  const result = db
-    .prepare(
-      "INSERT INTO jobs (title, company, type, description, location, salary, url, tags, posted_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    )
-    .run(title, company, type || "fulltime", description || "", location || "", salary || "", url || "", tags || "", req.user.userId);
-  const job = db.prepare("SELECT * FROM jobs WHERE id = ?").get(result.lastInsertRowid);
-  res.json(job);
-});
-
-// Delete a job (admin only)
-app.delete("/jobs/:id", requireAuth, requireAdmin, (req, res) => {
-  const result = db.prepare("DELETE FROM jobs WHERE id = ?").run(req.params.id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: "Job not found." });
+  try {
+    const result = await db.query(
+      `INSERT INTO jobs (title, company, type, description, location, salary, url, tags, posted_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [title, company, type || "fulltime", description || "", location || "", salary || "", url || "", tags || "", req.user.userId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Couldn't post job." });
   }
-  res.json({ success: true });
 });
 
-// Verified syllabus per branch-semester (add more here as you confirm them)
+// delete a job (admin only)
+app.delete("/jobs/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query("DELETE FROM jobs WHERE id = $1", [req.params.id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Job not found." });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Couldn't delete job." });
+  }
+});
+
+// ===== AI Tutor (unchanged — it never touches the database) =====
 const tutorSyllabus = {
   "CSE-3": `- CIC-201 Data Structures & Algorithms: arrays & stacks, linked lists & trees, BSTs & graphs (BFS, DFS, AVL, Kruskal, Prim), sorting & hashing.
 - CIC-203 Database Management Systems: ER & relational model, SQL & design, normalization (1NF–BCNF), transactions & concurrency (ACID, locking).`,
 };
 
-// Calls Gemini, retrying a few times on transient failures (rate limits, blips)
 async function askGemini(systemPrompt, contents) {
   const url =
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
@@ -248,14 +255,12 @@ async function askGemini(systemPrompt, contents) {
       });
       const data = await response.json();
       if (response.ok) return { ok: true, data };
-
       console.error(`Gemini attempt ${attempt} failed (${response.status}):`, JSON.stringify(data));
-      // Only retry temporary errors; bail out on config errors like 400/403
       if (![429, 500, 503].includes(response.status)) return { ok: false, status: response.status };
     } catch (err) {
       console.error(`Gemini attempt ${attempt} threw:`, err.message);
     }
-    await new Promise((r) => setTimeout(r, 700 * attempt)); // wait, then retry
+    await new Promise((r) => setTimeout(r, 700 * attempt));
   }
   return { ok: false, status: 503 };
 }
@@ -265,7 +270,6 @@ app.post("/tutor", async (req, res) => {
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "No messages provided." });
   }
-
   const syllabus = tutorSyllabus[`${branch}-${semester}`];
   const systemPrompt = `You are StudyUSICT's AI study tutor for a student at USICT, GGSIPU (Guru Gobind Singh Indraprastha University), in the ${branch} branch, Semester ${semester}.
 ${syllabus ? "Their syllabus this semester includes:\n" + syllabus + "\n" : ""}Use your knowledge of the standard GGSIPU/USICT ${branch} curriculum for Semester ${semester} to ground your explanations and examples in the subjects this student is actually studying. Treat the syllabus as a reference to focus your help — not as a hard limit. Help them understand concepts, work through problems, write code and pseudocode, and prepare for university exams. You may also answer related academic and technical questions that aren't explicitly listed. Be clear and concise, and use simple language a student can follow.`;
@@ -276,12 +280,13 @@ ${syllabus ? "Their syllabus this semester includes:\n" + syllabus + "\n" : ""}U
   if (!result.ok) {
     return res.status(503).json({ error: "The tutor is busy right now — please try again in a few seconds." });
   }
-
   const reply =
     result.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
     "I couldn't generate a response for that — try rephrasing your question.";
   res.json({ reply });
 });
+
+db.initDb().catch((err) => console.error("Failed to set up database:", err));
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
