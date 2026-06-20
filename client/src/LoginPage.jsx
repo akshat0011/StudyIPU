@@ -8,6 +8,7 @@ function LoginPage({ onLogin }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // NEW
   const [message, setMessage] = useState("");
 
   async function handleSubmit(event) {
@@ -118,13 +119,27 @@ function LoginPage({ onLogin }) {
           </div>
           <div className="auth-field">
             <label className="field-label">Password</label>
-            <input
-              className="auth-input"
-              type="password"
-              value={password}
-              placeholder="••••••••"
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="password-wrap">
+              <input
+                className="auth-input"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                placeholder="••••••••"
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.9 4.2A9.1 9.1 0 0 1 12 4c5 0 9.3 3.1 11 7.5a12.4 12.4 0 0 1-2.6 4M6.3 6.3A12.5 12.5 0 0 0 1 11.5 12 12 0 0 0 12 19a9 9 0 0 0 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m2 2 20 20"/></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                )}
+              </button>
+            </div>
           </div>
           <button type="submit" className="auth-submit">
             {mode === "signup" ? "Create account" : "Log in"}

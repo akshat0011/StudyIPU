@@ -1216,3 +1216,89 @@ select:focus { outline: none; border-color: var(--accent); }
 .logo-dark { display: none; }
 [data-theme="dark"] .logo-light { display: none; }
 [data-theme="dark"] .logo-dark { display: inline-block; }
+
+/* ===== Animations ===== */
+
+/* smooth fade between light and dark */
+body * {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* each page eases in on load / navigation */
+.page   { animation: fadeSlideUp 0.5s ease both; }
+.topbar { animation: fadeIn 0.6s ease both; }
+
+/* chat replies fade in as they arrive */
+.chat-msg { animation: fadeSlideUp 0.35s ease both; }
+
+/* modals pop in */
+.modal-overlay { animation: fadeIn 0.2s ease both; }
+.modal-card    { animation: fadeSlideUp 0.28s ease both; }
+
+/* cards lift on hover */
+.cat-card, .job-card, .unit-card, .resource-row {
+  transition: transform 0.18s ease, box-shadow 0.18s ease,
+              background-color 0.25s ease, border-color 0.25s ease;
+}
+.cat-card:hover, .job-card:hover, .unit-card:hover, .resource-row:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* buttons lift on hover, press down on click */
+.btn-primary, .btn-dark, .access-btn, .append-btn, .post-job-btn,
+.job-apply, .modal-publish, .auth-submit, .tutor-send {
+  transition: transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-primary:hover, .btn-dark:hover, .access-btn:hover, .append-btn:hover,
+.post-job-btn:hover, .job-apply:hover, .modal-publish:hover,
+.auth-submit:hover, .tutor-send:hover {
+  transform: translateY(-2px);
+}
+.btn-primary:active, .btn-dark:active, .access-btn:active, .append-btn:active,
+.post-job-btn:active, .job-apply:active, .modal-publish:active,
+.auth-submit:active, .tutor-send:active {
+  transform: translateY(0);
+}
+
+/* respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* keep the login button static — no hover lift or fade */
+.auth-submit, .auth-submit:hover, .auth-submit:active {
+  transform: none;
+  transition: none;
+}
+
+/* show/hide password */
+.password-wrap { position: relative; }
+.password-wrap .auth-input { padding-right: 44px; }
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.password-toggle:hover { color: var(--text); }
+.password-toggle svg { width: 18px; height: 18px; }
