@@ -422,6 +422,35 @@ select:focus { outline: none; border-color: var(--accent); }
 .filter-right .filter-label { text-align: right; }
 .filter-branch-name { font-weight: 800; font-size: 1.05rem; color: var(--text); }
 
+/* Resource Hub: keep the page fixed; scroll only inside the panels */
+.hub-grid {
+  height: calc(100vh - 230px);  /* estimate of nav + filter-bar height — tune this */
+  overflow: hidden;
+}
+
+.hub-aside {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;                /* lets the list scroll instead of stretching the page */
+  height: 100%;
+}
+
+.cat-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;             /* the subject list scrolls on its own */
+}
+
+.hub-detail {
+  height: 100%;
+  overflow-y: auto;             /* the detail panel scrolls on its own too */
+}
+
+.cat-search {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
 .hub-grid {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -1380,3 +1409,4 @@ body * {
   color: var(--text-muted);
 }
 .contact-value { font-weight: 600; font-size: 0.95rem; }
+

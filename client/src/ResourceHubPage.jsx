@@ -1,15 +1,20 @@
 import { API_URL } from "./api";
 import { useState, useEffect } from "react";
 
-const branches = ["CSE", "IT", "ECE", "AIML", "AIDS"];
+const branches = ["CSE", "IT", "ECE", "CSAI", "CSDS"];
 
 const branchNames = {
   CSE: "Computer Science & Engineering",
   IT: "Information Technology",
   ECE: "Electronics & Communication",
-  AIML: "AI & Machine Learning",
-  AIDS: "AI & Data Science",
+  CSAI: "CSE – Artificial Intelligence",
+  CSDS: "CSE – Data Science",
 };
+
+const yearSchemes = [
+  { id: "2024_and_after", label: "2024 & after" },
+  { id: "2023_and_before", label: "2023 & before" },
+];
 
 const semesters = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
@@ -25,37 +30,31 @@ const tabTypeMap = { notes: "notes", lectures: "playlist", papers: "pyq" };
 // The reverse — which tab to open after adding a given material type
 const typeTabMap = { notes: "notes", playlist: "lectures", pyq: "papers" };
 
-const subjects = [
-  {
-    code: "CIC-201",
-    name: "Data Structures & Algorithms",
-    credits: 4,
-    desc: "Foundational course on linear & non-linear data structures, search-sort algorithms, time/space complexity analysis.",
-    units: [
-      { title: "Unit I: Arrays & Stacks", desc: "Address calculation, row/column major, Stack application (infix-postfix, evaluation), Queue variations." },
-      { title: "Unit II: Linked Lists & Trees", desc: "Singly, doubly, circular list, binary trees, heap tree insertion, deletion, and heap-sort." },
-      { title: "Unit III: Binary Search Trees & Graphs", desc: "BST operations, AVL rotations, graph representations (adj matrix/list), BFS, DFS, Kruskals & Prims." },
-      { title: "Unit IV: Sorting & Hashing", desc: "Quick sort, merge sort, hash functions, collision resolution methods." },
-    ],
-  },
-  {
-    code: "CIC-203",
-    name: "Database Management Systems",
-    credits: 4,
-    desc: "Core database concepts — relational model, SQL, normalization, transactions, and concurrency control.",
-    units: [
-      { title: "Unit I: ER & Relational Model", desc: "Entities, attributes, relationships, keys, relational algebra, and tuple calculus." },
-      { title: "Unit II: SQL & Database Design", desc: "DDL, DML, joins, nested queries, views, and integrity constraints." },
-      { title: "Unit III: Normalization", desc: "Functional dependencies, 1NF to BCNF, decomposition, and lossless joins." },
-      { title: "Unit IV: Transactions & Concurrency", desc: "ACID properties, schedules, locking protocols, and deadlock handling." },
-    ],
-  },
-];
+// The database stores a subject's units as JSON text (an array of { title, desc }).
+// Rows without content yet come back as null, so default to an empty list.
+function parseUnits(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 function ResourceHubPage({ user }) {
+  const [yearScheme, setYearScheme] = useState("2024_and_after");
   const [branch, setBranch] = useState("CSE");
   const [semester, setSemester] = useState("3");
-  const [selectedCode, setSelectedCode] = useState("CIC-201");
+  const [search, setSearch] = useState("");
+
+  // Subjects now come from the database, filtered by year + branch + semester
+  const [subjects, setSubjects] = useState([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [subjectsError, setSubjectsError] = useState("");
+
+  const [selectedCode, setSelectedCode] = useState("");
   const [activeTab, setActiveTab] = useState("syllabus");
 
   // Materials loaded from the database
@@ -82,24 +81,55 @@ function ResourceHubPage({ user }) {
       .catch(() => {});
   }, []);
 
+  // Load subjects whenever the year scheme / branch / semester changes
+  useEffect(() => {
+    setLoadingSubjects(true);
+    setSubjectsError("");
+    const url = `${API_URL}/subjects?year=${yearScheme}&branch=${branch}&semester=${semester}`;
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        const list = data.subjects || [];
+        setSubjects(list);
+        setSelectedCode(list.length ? list[0].code : ""); // select the first subject
+        setLoadingSubjects(false);
+      })
+      .catch(() => {
+        setSubjects([]);
+        setSelectedCode("");
+        setSubjectsError("Couldn't load subjects — the backend may be waking up. Try again in a moment.");
+        setLoadingSubjects(false);
+      });
+  }, [yearScheme, branch, semester]);
+
   // Save progress whenever a box is ticked or unticked
   useEffect(() => {
     localStorage.setItem("usict-progress", JSON.stringify(checked));
   }, [checked]);
 
+  // Filter the catalog by the search box (matches name or code)
+  const q = search.trim().toLowerCase();
+  const visibleSubjects = q
+    ? subjects.filter(
+        (s) => s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q)
+      )
+    : subjects;
+
   const selected = subjects.find((s) => s.code === selectedCode);
   const activeLabel = contentTabs.find((t) => t.id === activeTab).label;
+  const selectedUnits = parseUnits(selected?.units);
 
   // The materials belonging to the open subject AND the open tab
   const tabType = tabTypeMap[activeTab]; // undefined while on "syllabus"
-  const tabMaterials = tabType
-    ? materials.filter((m) => m.subject === selected.code && m.type === tabType)
-    : [];
+  const tabMaterials =
+    tabType && selected
+      ? materials.filter((m) => m.subject === selected.code && m.type === tabType)
+      : [];
 
   // How many units of the open subject are checked off
-  const doneCount = selected.units.filter(
-    (u, i) => checked[`${selected.code}-${i}`]
-  ).length;
+  const doneCount = selected
+    ? selectedUnits.filter((u, i) => checked[`${selected.code}-${i}`]).length
+    : 0;
 
   function toggleUnit(code, index) {
     const key = `${code}-${index}`;
@@ -180,6 +210,17 @@ function ResourceHubPage({ user }) {
     <div className="page">
       <div className="hub-filter">
         <div className="filter-group">
+          <span className="filter-label">Syllabus Scheme</span>
+          <select value={yearScheme} onChange={(e) => setYearScheme(e.target.value)}>
+            {yearSchemes.map((y) => (
+              <option key={y.id} value={y.id}>{y.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-divider"></div>
+
+        <div className="filter-group">
           <span className="filter-label">USICT Branch</span>
           <div className="branch-tabs">
             {branches.map((b) => (
@@ -212,125 +253,162 @@ function ResourceHubPage({ user }) {
       </div>
 
       <div className="hub-grid">
-        <aside>
+        <aside className="hub-aside">
           <div className="catalog-label">Semester Subject Catalog</div>
+          <input
+            className="modal-input cat-search"
+            type="text"
+            value={search}
+            placeholder="Search subjects by name or code…"
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <div className="cat-list">
-            {subjects.map((s) => (
-              <button
-                key={s.code}
-                className={s.code === selectedCode ? "cat-card active" : "cat-card"}
-                onClick={() => setSelectedCode(s.code)}
-              >
-                <div className="cat-card-top">
-                  <span className="cat-code">{s.code}</span>
-                  <span className="cat-cr">{s.credits} Credits</span>
-                </div>
-                <div className="cat-name">{s.name}</div>
-              </button>
-            ))}
+            {loadingSubjects ? (
+              <div className="tab-empty">Loading subjects…</div>
+            ) : subjectsError ? (
+              <div className="tab-empty">{subjectsError}</div>
+            ) : visibleSubjects.length === 0 ? (
+              <div className="tab-empty">
+                {subjects.length === 0
+                  ? "No subjects found for this branch and semester yet."
+                  : "No subjects match your search."}
+              </div>
+            ) : (
+              visibleSubjects.map((s) => (
+                <button
+                  key={s.code}
+                  className={s.code === selectedCode ? "cat-card active" : "cat-card"}
+                  onClick={() => setSelectedCode(s.code)}
+                >
+                  <div className="cat-card-top">
+                    <span className="cat-code">{s.code}</span>
+                    <span className="cat-cr">
+                      {s.credits != null ? `${s.credits} Credits` : "—"}
+                    </span>
+                  </div>
+                  <div className="cat-name">{s.name}</div>
+                </button>
+              ))
+            )}
           </div>
         </aside>
 
         <main className="hub-detail">
-          <div className="detail-top">
-            <span className="course-badge">Official GGSIPU Course: {selected.code}</span>
-            <span className="exam-weight">Exam Weightage: Continuous evaluation criteria applies</span>
-          </div>
-
-          <h2 className="detail-title">{selected.name}</h2>
-          <p className="detail-desc">{selected.desc}</p>
-
-          <div className="detail-tabs">
-            {contentTabs.map((t) => (
-              <button
-                key={t.id}
-                className={t.id === activeTab ? "detail-tab active" : "detail-tab"}
-                onClick={() => setActiveTab(t.id)}
-              >
-                {t.label}
-              </button>
-            ))}
-            {user?.role === "admin" && (
-              <button className="append-btn" onClick={openAddModal}>
-                <span className="append-plus">+</span> Append Resource
-              </button>
-            )}
-          </div>
-
-          {activeTab === "syllabus" ? (
-            <div>
-              <div className="units-head">
-                <div>
-                  <div className="units-label">Official Syllabus Units</div>
-                  <p className="units-sub">Track your exam preparation progress by checking off units below.</p>
-                </div>
-                <span className="units-progress">{doneCount}/{selected.units.length} Completed</span>
-              </div>
-              <div className="units-grid">
-                {selected.units.map((u, i) => {
-                  const done = !!checked[`${selected.code}-${i}`];
-                  return (
-                    <div className={done ? "unit-card done" : "unit-card"} key={u.title}>
-                      <button
-                        type="button"
-                        className={done ? "unit-check checked" : "unit-check"}
-                        onClick={() => toggleUnit(selected.code, i)}
-                        aria-label="Mark unit complete"
-                      >
-                        {done && (
-                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                        )}
-                      </button>
-                      <h4 className="unit-title">{u.title}</h4>
-                      <p className="unit-desc">{u.desc}</p>
-                    </div>
-                  );
-                })}
-              </div>
+          {!selected ? (
+            <div className="tab-empty">
+              {loadingSubjects
+                ? "Loading…"
+                : "No subjects to display for this branch and semester yet."}
             </div>
           ) : (
-            <div>
-              <div className="units-label">{activeLabel}</div>
-              {tabMaterials.length === 0 ? (
-                <div className="tab-empty">
-                  No {activeLabel} added for {selected.name} yet.
-                  {user?.role === "admin" && " Click “Append Resource” to add the first one."}
+            <>
+              <div className="detail-top">
+                <span className="course-badge">Official GGSIPU Course: {selected.code}</span>
+                <span className="exam-weight">Exam Weightage: Continuous evaluation criteria applies</span>
+              </div>
+
+              <h2 className="detail-title">{selected.name}</h2>
+              {selected.desc && <p className="detail-desc">{selected.desc}</p>}
+
+              <div className="detail-tabs">
+                {contentTabs.map((t) => (
+                  <button
+                    key={t.id}
+                    className={t.id === activeTab ? "detail-tab active" : "detail-tab"}
+                    onClick={() => setActiveTab(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+                {user?.role === "admin" && (
+                  <button className="append-btn" onClick={openAddModal}>
+                    <span className="append-plus">+</span> Append Resource
+                  </button>
+                )}
+              </div>
+
+              {activeTab === "syllabus" ? (
+                <div>
+                  <div className="units-head">
+                    <div>
+                      <div className="units-label">Official Syllabus Units</div>
+                      <p className="units-sub">Track your exam preparation progress by checking off units below.</p>
+                    </div>
+                    {selectedUnits.length > 0 && (
+                      <span className="units-progress">{doneCount}/{selectedUnits.length} Completed</span>
+                    )}
+                  </div>
+                  {selectedUnits.length === 0 ? (
+                    <div className="tab-empty">Detailed syllabus for this subject is coming soon.</div>
+                  ) : (
+                    <div className="units-grid">
+                      {selectedUnits.map((u, i) => {
+                        const done = !!checked[`${selected.code}-${i}`];
+                        return (
+                          <div className={done ? "unit-card done" : "unit-card"} key={u.title || i}>
+                            <button
+                              type="button"
+                              className={done ? "unit-check checked" : "unit-check"}
+                              onClick={() => toggleUnit(selected.code, i)}
+                              aria-label="Mark unit complete"
+                            >
+                              {done && (
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                              )}
+                            </button>
+                            <h4 className="unit-title">{u.title}</h4>
+                            <p className="unit-desc">{u.desc}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="resource-list">
-                  {tabMaterials.map((m) => (
-                    <div className="resource-row" key={m.id}>
-                      <a
-                        href={m.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="resource-link"
-                      >
-                        <div className="resource-info">
-                          <span className="resource-title">{m.title}</span>
-                          <span className="resource-url">{m.url}</span>
-                        </div>
-                        <span className="resource-open">Open ↗</span>
-                      </a>
-                      {user?.role === "admin" && (
-                        <button
-                          className="resource-delete"
-                          onClick={() => handleDelete(m.id)}
-                          title="Remove resource"
-                        >
-                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
-                        </button>
-                      )}
+                <div>
+                  <div className="units-label">{activeLabel}</div>
+                  {tabMaterials.length === 0 ? (
+                    <div className="tab-empty">
+                      No {activeLabel} added for {selected.name} yet.
+                      {user?.role === "admin" && " Click “Append Resource” to add the first one."}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="resource-list">
+                      {tabMaterials.map((m) => (
+                        <div className="resource-row" key={m.id}>
+                          <a
+                            href={m.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="resource-link"
+                          >
+                            <div className="resource-info">
+                              <span className="resource-title">{m.title}</span>
+                              <span className="resource-url">{m.url}</span>
+                            </div>
+                            <span className="resource-open">Open ↗</span>
+                          </a>
+                          {user?.role === "admin" && (
+                            <button
+                              className="resource-delete"
+                              onClick={() => handleDelete(m.id)}
+                              title="Remove resource"
+                            >
+                              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </main>
       </div>
 
-      {isModalOpen && (
+      {isModalOpen && selected && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
