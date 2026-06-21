@@ -1475,3 +1475,62 @@ body * {
 .unit-form .modal-textarea { margin-bottom: 0.7rem; }
 .unit-form .modal-textarea { min-height: 68px; }
 
+/* Admin: bulk-import button + modal */
+.cat-admin-actions { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.85rem; }
+.cat-admin-actions .cat-add-btn { margin-bottom: 0; }
+.cat-bulk-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background-color: var(--surface);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cat-bulk-btn:hover { background-color: var(--surface-2); color: var(--accent); border-color: var(--accent); }
+
+.bulk-help { font-size: 0.85rem; color: var(--text-muted); margin: 0 0 0.9rem; line-height: 1.5; }
+.bulk-help code {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  background-color: var(--surface-2);
+  padding: 0.1rem 0.35rem;
+  border-radius: 5px;
+}
+.bulk-textarea { min-height: 150px; font-family: var(--font-mono); font-size: 0.85rem; }
+
+.bulk-preview {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.2rem;
+  background-color: var(--surface-2);
+}
+.bulk-preview-head { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.6rem; }
+.bulk-preview-list { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow-y: auto; }
+.bulk-preview-list li { font-size: 0.85rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border); }
+.bulk-preview-list li:last-child { border-bottom: none; }
+.bulk-code { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+.bulk-meta { color: var(--text-muted); font-size: 0.8rem; }
+.bulk-preview-errors { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.bulk-preview-errors li { font-size: 0.8rem; color: #ef4444; padding: 0.15rem 0; }
+
+.bulk-success {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0d9488;
+  background-color: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.3);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1.2rem;
+}
+

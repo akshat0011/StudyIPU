@@ -38,6 +38,64 @@ function parseUnits(raw) {
   }
 }
 
+// Turn pasted bulk-import text into a list of subjects. Auto-detects the
+// format: JSON (starts with [ or {) carries full units; otherwise each line
+// is a "code | name | credits" row (tab- or pipe-separated). Returns the
+// parsed subjects plus any per-row error messages for the preview.
+function parseBulkInput(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return { subjects: [], errors: [] };
+
+  // --- JSON format (full, with units) ---
+  if (trimmed[0] === "[" || trimmed[0] === "{") {
+    let data;
+    try {
+      data = JSON.parse(trimmed);
+    } catch (e) {
+      return { subjects: [], errors: [`Invalid JSON: ${e.message}`] };
+    }
+    const arr = Array.isArray(data) ? data : [data];
+    const subjects = [];
+    const errors = [];
+    arr.forEach((s, i) => {
+      if (!s || !s.code || !s.name) {
+        errors.push(`Item ${i + 1}: missing "code" or "name".`);
+        return;
+      }
+      const units = Array.isArray(s.units)
+        ? s.units
+            .map((u) => ({
+              title: String(u.title || "").trim(),
+              desc: String(u.desc || u.description || "").trim(),
+            }))
+            .filter((u) => u.title || u.desc)
+        : [];
+      subjects.push({
+        code: String(s.code).trim(),
+        name: String(s.name).trim(),
+        credits: s.credits ?? "",
+        units,
+      });
+    });
+    return { subjects, errors };
+  }
+
+  // --- Table format (one subject per line: code | name | credits) ---
+  const subjects = [];
+  const errors = [];
+  trimmed.split(/\r?\n/).forEach((line, i) => {
+    const raw = line.trim();
+    if (!raw) return;
+    const parts = raw.split(/\t|\|/).map((p) => p.trim());
+    if (parts.length < 2 || !parts[0] || !parts[1]) {
+      errors.push(`Line ${i + 1}: need at least "code | name".`);
+      return;
+    }
+    subjects.push({ code: parts[0], name: parts[1], credits: parts[2] || "", units: [] });
+  });
+  return { subjects, errors };
+}
+
 function ResourceHubPage({ user }) {
   const [yearScheme, setYearScheme] = useState("2024_and_after");
   const [branch, setBranch] = useState("CSE");
@@ -71,6 +129,14 @@ function ResourceHubPage({ user }) {
   const [subjUnits, setSubjUnits] = useState(blankUnits);
   const [subjError, setSubjError] = useState("");
   const [subjSubmitting, setSubjSubmitting] = useState(false);
+
+  // Bulk-import popup state (admin only)
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkPreview, setBulkPreview] = useState(null); // { subjects, errors } once previewed
+  const [bulkError, setBulkError] = useState("");
+  const [bulkResult, setBulkResult] = useState(null); // { inserted, skipped } after import
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   // Which syllabus units are checked off (remembered in the browser)
   const [checked, setChecked] = useState(() =>
@@ -314,6 +380,59 @@ function ResourceHubPage({ user }) {
     }
   }
 
+  function openBulkModal() {
+    setBulkText("");
+    setBulkPreview(null);
+    setBulkError("");
+    setBulkResult(null);
+    setIsBulkModalOpen(true);
+  }
+
+  // Parse the pasted text (without saving) so the admin can review the rows
+  function handleBulkPreview() {
+    setBulkError("");
+    setBulkResult(null);
+    setBulkPreview(parseBulkInput(bulkText));
+  }
+
+  async function handleBulkImport() {
+    const parsed = bulkPreview || parseBulkInput(bulkText);
+    if (parsed.subjects.length === 0) {
+      setBulkError("Nothing to import — paste some subjects and click Preview first.");
+      return;
+    }
+    setBulkSubmitting(true);
+    setBulkError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(API_URL + "/subjects/bulk", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          year_scheme: yearScheme,
+          branch,
+          semester,
+          subjects: parsed.subjects,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBulkError(data.error || "Couldn't import the subjects.");
+        setBulkSubmitting(false);
+        return;
+      }
+      setBulkResult({ inserted: data.inserted, skipped: data.skipped });
+      setBulkSubmitting(false);
+      await loadSubjects(); // refresh the catalog with the new subjects
+    } catch {
+      setBulkError("Couldn't reach the server. Is the backend running?");
+      setBulkSubmitting(false);
+    }
+  }
+
   return (
     <div className="page">
       <div className="hub-filter">
@@ -371,9 +490,15 @@ function ResourceHubPage({ user }) {
             onChange={(e) => setSearch(e.target.value)}
           />
           {user?.role === "admin" && (
-            <button className="cat-add-btn" onClick={openAddSubjectModal}>
-              <span className="append-plus">+</span> Add New Subject
-            </button>
+            <div className="cat-admin-actions">
+              <button className="cat-add-btn" onClick={openAddSubjectModal}>
+                <span className="append-plus">+</span> Add New Subject
+              </button>
+              <button className="cat-bulk-btn" onClick={openBulkModal}>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9M8 17l4 4 4-4"/></svg>
+                Bulk Import
+              </button>
+            </div>
           )}
           <div className="cat-list">
             {loadingSubjects ? (
@@ -676,6 +801,111 @@ function ResourceHubPage({ user }) {
                 <button className="modal-publish" onClick={handleAddSubject} disabled={subjSubmitting}>
                   <span className="append-plus">+</span> {subjSubmitting ? "Adding..." : "Add Subject"}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isBulkModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsBulkModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-left">
+                <span className="modal-icon">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9M8 17l4 4 4-4"/></svg>
+                </span>
+                <div>
+                  <div className="modal-title">Bulk Import Subjects</div>
+                  <div className="modal-sub">
+                    Into: {branchNames[branch]} · Semester {semester} ·{" "}
+                    {yearSchemes.find((y) => y.id === yearScheme)?.label}
+                  </div>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setIsBulkModalOpen(false)} aria-label="Close">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <p className="bulk-help">
+                Paste a <strong>table</strong> (one per line: <code>code | name | credits</code>) or a
+                {" "}<strong>JSON array</strong> of <code>{"{ code, name, credits, units }"}</code> — the format
+                is auto-detected. Subjects go into the scheme, branch &amp; semester shown above.
+              </p>
+              <textarea
+                className="modal-textarea bulk-textarea"
+                value={bulkText}
+                placeholder={"ICT-201 | Foundations of Computer Science | 4\nICT-203 | Database Management Systems | 3\n\n…or paste a JSON array of { code, name, credits, units }"}
+                onChange={(e) => {
+                  setBulkText(e.target.value);
+                  setBulkPreview(null);
+                  setBulkResult(null);
+                }}
+              />
+
+              {bulkError && <p className="modal-error">{bulkError}</p>}
+
+              {bulkPreview && !bulkResult && (
+                <div className="bulk-preview">
+                  <div className="bulk-preview-head">
+                    {bulkPreview.subjects.length} subject{bulkPreview.subjects.length === 1 ? "" : "s"} ready
+                    {bulkPreview.errors.length > 0 &&
+                      ` · ${bulkPreview.errors.length} row${bulkPreview.errors.length === 1 ? "" : "s"} skipped`}
+                  </div>
+                  {bulkPreview.subjects.length > 0 && (
+                    <ul className="bulk-preview-list">
+                      {bulkPreview.subjects.map((s, i) => (
+                        <li key={i}>
+                          <span className="bulk-code">{s.code}</span> {s.name}
+                          {s.credits !== "" && <span className="bulk-meta"> · {s.credits} cr</span>}
+                          {s.units.length > 0 && <span className="bulk-meta"> · {s.units.length} units</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {bulkPreview.errors.length > 0 && (
+                    <ul className="bulk-preview-errors">
+                      {bulkPreview.errors.map((e, i) => (
+                        <li key={i}>{e}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {bulkResult && (
+                <div className="bulk-success">
+                  ✓ Imported {bulkResult.inserted} subject{bulkResult.inserted === 1 ? "" : "s"}
+                  {bulkResult.skipped > 0 &&
+                    `, skipped ${bulkResult.skipped} duplicate${bulkResult.skipped === 1 ? "" : "s"}`}
+                  .
+                </div>
+              )}
+
+              <div className="modal-divider"></div>
+
+              <div className="modal-actions">
+                <button className="modal-cancel" onClick={() => setIsBulkModalOpen(false)}>
+                  {bulkResult ? "Done" : "Cancel"}
+                </button>
+                {!bulkResult && (
+                  <>
+                    <button className="modal-cancel" onClick={handleBulkPreview} disabled={!bulkText.trim()}>
+                      Preview
+                    </button>
+                    <button
+                      className="modal-publish"
+                      onClick={handleBulkImport}
+                      disabled={bulkSubmitting || !bulkText.trim()}
+                    >
+                      {bulkSubmitting
+                        ? "Importing…"
+                        : `Import${bulkPreview ? " " + bulkPreview.subjects.length : ""}`}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

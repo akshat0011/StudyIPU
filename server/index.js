@@ -356,6 +356,66 @@ app.post("/subjects", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// bulk-add subjects for one year scheme + branch + semester (admin only).
+// Inserts in a single transaction (all-or-nothing) and skips subjects whose
+// code already exists for that scheme/branch/semester, so re-running is safe.
+app.post("/subjects/bulk", requireAuth, requireAdmin, async (req, res) => {
+  const { year_scheme, branch, semester, subjects } = req.body;
+  if (!year_scheme || !branch || !semester || !Array.isArray(subjects) || subjects.length === 0) {
+    return res.status(400).json({
+      error: "year_scheme, branch, semester, and a non-empty subjects array are required.",
+    });
+  }
+
+  // Validate + normalize every row up front (before opening a transaction)
+  const cleaned = [];
+  for (const s of subjects) {
+    if (!s || !s.code || !s.name) {
+      return res.status(400).json({
+        error: "Every subject needs at least a code and a name.",
+      });
+    }
+    cleaned.push({
+      code: String(s.code).trim(),
+      name: String(s.name).trim(),
+      credits: s.credits != null && s.credits !== "" ? parseInt(s.credits, 10) : null,
+      units: Array.isArray(s.units) && s.units.length ? JSON.stringify(s.units) : null,
+    });
+  }
+
+  const sem = parseInt(semester, 10);
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    let inserted = 0;
+    let skipped = 0;
+    for (const s of cleaned) {
+      const exists = await client.query(
+        "SELECT 1 FROM subjects WHERE year_scheme = $1 AND branch = $2 AND semester = $3 AND code = $4",
+        [year_scheme, branch, sem, s.code]
+      );
+      if (exists.rowCount > 0) {
+        skipped++; // duplicate code in this scheme/branch/semester — skip it
+        continue;
+      }
+      await client.query(
+        `INSERT INTO subjects (year_scheme, branch, semester, code, name, credits, units)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [year_scheme, branch, sem, s.code, s.name, s.credits, s.units]
+      );
+      inserted++;
+    }
+    await client.query("COMMIT");
+    res.status(201).json({ inserted, skipped, total: cleaned.length });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error(err);
+    res.status(500).json({ error: "Couldn't import subjects — nothing was saved." });
+  } finally {
+    client.release();
+  }
+});
+
 // delete a subject (admin only)
 app.delete("/subjects/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
