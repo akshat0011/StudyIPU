@@ -1,6 +1,6 @@
 import { API_URL } from "./api";
 import { useState, useEffect } from "react";
-import { Routes, Route, NavLink, Link } from "react-router";
+import { Routes, Route, NavLink, Link, useLocation, useNavigate } from "react-router";
 import Logo from "./Logo";
 import Footer from "./Footer";
 import DashboardPage from "./DashboardPage";
@@ -34,6 +34,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light"); // NEW
   const [menuOpen, setMenuOpen] = useState(false); // NEW: mobile nav open/closed
+  const location = useLocation();  // NEW: drives the page-transition animation
+  const navigate = useNavigate();  // NEW: so logout can transition home
 
   useEffect(() => {                                              // NEW
     document.documentElement.setAttribute("data-theme", theme);  // NEW
@@ -54,6 +56,7 @@ function App() {
   function handleLogout() {
     localStorage.removeItem("token");
     setUser(null);
+    navigate("/"); // NEW: head home so the page transition plays on logout
   }
 
   return (
@@ -114,16 +117,18 @@ function App() {
         </div>
       </header>
 
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/resources" element={<ResourceHubPage user={user} />} />
-        <Route path="/tutor" element={<AITutorPage />} />
-        <Route path="/careers" element={<CareersPage user={user} />} />
-        <Route path="/gpa" element={<GpaPage />} />
-        <Route path="/results" element={<ResultsPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/login" element={<LoginPage onLogin={setUser} />} />
-      </Routes>
+      <div className="route-view" key={location.pathname}>
+        <Routes location={location}>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/resources" element={<ResourceHubPage user={user} />} />
+          <Route path="/tutor" element={<AITutorPage />} />
+          <Route path="/careers" element={<CareersPage user={user} />} />
+          <Route path="/gpa" element={<GpaPage />} />
+          <Route path="/results" element={<ResultsPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/login" element={<LoginPage onLogin={setUser} />} />
+        </Routes>
+      </div>
 
       <Footer />
     </div>
