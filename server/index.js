@@ -315,6 +315,61 @@ app.get("/subjects", async (req, res) => {
   }
 });
 
+// add a subject + its syllabus units (admin only)
+app.post("/subjects", requireAuth, requireAdmin, async (req, res) => {
+  const {
+    year_scheme, branch, semester, code, name,
+    credits, units, lecture_hours, practical_hours, category, route,
+  } = req.body;
+  if (!year_scheme || !branch || !semester || !code || !name) {
+    return res.status(400).json({
+      error: "Year scheme, branch, semester, code, and name are required.",
+    });
+  }
+  try {
+    const result = await db.query(
+      `INSERT INTO subjects
+         (year_scheme, branch, semester, route, category, code, name,
+          lecture_hours, practical_hours, credits, units)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, year_scheme, branch, semester, route, category, code, name,
+                 lecture_hours, practical_hours, credits, units`,
+      [
+        year_scheme,
+        branch,
+        parseInt(semester, 10),
+        route || null,
+        category || null,
+        code.trim(),
+        name.trim(),
+        lecture_hours != null ? parseInt(lecture_hours, 10) : null,
+        practical_hours != null ? parseInt(practical_hours, 10) : null,
+        credits != null && credits !== "" ? parseInt(credits, 10) : null,
+        // units arrive as an array of { title, desc }; store as JSON text
+        Array.isArray(units) && units.length ? JSON.stringify(units) : null,
+      ]
+    );
+    res.status(201).json({ subject: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Couldn't add subject." });
+  }
+});
+
+// delete a subject (admin only)
+app.delete("/subjects/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query("DELETE FROM subjects WHERE id = $1", [req.params.id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Subject not found." });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Couldn't delete subject." });
+  }
+});
+
 // ===== AI Tutor (unchanged — it never touches the database) =====
 const tutorSyllabus = {
   "CSE-3": `- CIC-201 Data Structures & Algorithms: arrays & stacks, linked lists & trees, BSTs & graphs (BFS, DFS, AVL, Kruskal, Prim), sorting & hashing.

@@ -1,6 +1,14 @@
 import { API_URL } from "./api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { branchCodes as branches, branchNames } from "./branches"; // CHANGED: shared list
+
+// A fresh set of 4 blank syllabus units for the add-subject form.
+const blankUnits = () => [
+  { title: "", desc: "" },
+  { title: "", desc: "" },
+  { title: "", desc: "" },
+  { title: "", desc: "" },
+];
 
 const yearSchemes = [
   { id: "2024_and_after", label: "2024 & after" },
@@ -59,6 +67,15 @@ function ResourceHubPage({ user }) {
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Add-subject popup state (admin only)
+  const [isSubjModalOpen, setIsSubjModalOpen] = useState(false);
+  const [subjCode, setSubjCode] = useState("");
+  const [subjName, setSubjName] = useState("");
+  const [subjCredits, setSubjCredits] = useState("4");
+  const [subjUnits, setSubjUnits] = useState(blankUnits);
+  const [subjError, setSubjError] = useState("");
+  const [subjSubmitting, setSubjSubmitting] = useState(false);
+
   // Which syllabus units are checked off (remembered in the browser)
   const [checked, setChecked] = useState(() =>
     JSON.parse(localStorage.getItem("usict-progress") || "{}")
@@ -72,29 +89,43 @@ function ResourceHubPage({ user }) {
       .catch(() => {});
   }, []);
 
-  // Load subjects whenever the year scheme / branch / semester changes
+  // Load subjects for the current year scheme / branch / semester. Extracted
+  // into a callback so we can also re-run it after an admin adds a subject.
+  // Pass a code to keep that subject selected after the refresh.
+  const loadSubjects = useCallback(
+    (selectCode) => {
+      setLoadingSubjects(true);
+      setSubjectsError("");
+      const url = `${API_URL}/subjects?year=${yearScheme}&branch=${branch}&semester=${semester}`;
+      return fetch(url)
+        .then((res) => res.json())
+        .then((data) => {
+          const list = data.subjects || [];
+          setSubjects(list);
+          setSelectedCode((prev) => {
+            if (selectCode && list.some((s) => s.code === selectCode)) return selectCode;
+            if (prev && list.some((s) => s.code === prev)) return prev; // keep current pick
+            return list.length ? list[0].code : ""; // otherwise default to the first
+          });
+          setLoadingSubjects(false);
+        })
+        .catch(() => {
+          setSubjects([]);
+          setSelectedCode("");
+          setSubjectsError("Couldn't load subjects — the backend may be waking up. Try again in a moment.");
+          setLoadingSubjects(false);
+        });
+    },
+    [yearScheme, branch, semester]
+  );
+
+  // Re-load subjects whenever the filters (and therefore loadSubjects) change.
+  // loadSubjects flips a loading flag synchronously — an intentional, standard
+  // data-fetching pattern, so the set-state-in-effect rule is disabled here.
   useEffect(() => {
-    // Intentionally flip to a loading state the moment the filters change,
-    // before the fetch resolves — a normal data-fetching pattern.
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
-    setLoadingSubjects(true);
-    setSubjectsError("");
-    const url = `${API_URL}/subjects?year=${yearScheme}&branch=${branch}&semester=${semester}`;
-    fetch(url)
-      .then((res) => res.json())
-      .then((data) => {
-        const list = data.subjects || [];
-        setSubjects(list);
-        setSelectedCode(list.length ? list[0].code : ""); // select the first subject
-        setLoadingSubjects(false);
-      })
-      .catch(() => {
-        setSubjects([]);
-        setSelectedCode("");
-        setSubjectsError("Couldn't load subjects — the backend may be waking up. Try again in a moment.");
-        setLoadingSubjects(false);
-      });
-  }, [yearScheme, branch, semester]);
+    loadSubjects();
+  }, [loadSubjects]);
 
   // Save progress whenever a box is ticked or unticked
   useEffect(() => {
@@ -200,6 +231,93 @@ function ResourceHubPage({ user }) {
     }
   }
 
+  function openAddSubjectModal() {
+    setSubjCode("");
+    setSubjName("");
+    setSubjCredits("4");
+    setSubjUnits(blankUnits());
+    setSubjError("");
+    setIsSubjModalOpen(true);
+  }
+
+  // Update one field (title or desc) of one unit in the add-subject form
+  function updateSubjUnit(index, field, value) {
+    setSubjUnits((prev) =>
+      prev.map((u, i) => (i === index ? { ...u, [field]: value } : u))
+    );
+  }
+
+  async function handleAddSubject() {
+    setSubjError("");
+    if (!subjCode.trim() || !subjName.trim()) {
+      setSubjError("Please enter at least a subject code and name.");
+      return;
+    }
+    setSubjSubmitting(true);
+    // Keep only units the admin actually filled in (a title or some content)
+    const units = subjUnits
+      .map((u) => ({ title: u.title.trim(), desc: u.desc.trim() }))
+      .filter((u) => u.title || u.desc);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(API_URL + "/subjects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          year_scheme: yearScheme,
+          branch,
+          semester,
+          code: subjCode.trim(),
+          name: subjName.trim(),
+          credits: subjCredits,
+          units,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSubjError(data.error || "Couldn't add the subject. Please try again.");
+        setSubjSubmitting(false);
+        return;
+      }
+      await loadSubjects(data.subject?.code); // refresh and open the new subject
+      setIsSubjModalOpen(false);
+      setSubjSubmitting(false);
+    } catch {
+      setSubjError("Couldn't reach the server. Is the backend running?");
+      setSubjSubmitting(false);
+    }
+  }
+
+  async function handleDeleteSubject(id) {
+    const target = subjects.find((s) => s.id === id);
+    const confirmed = window.confirm(
+      `Delete ${target ? target.code : "this subject"} and its syllabus? This can't be undone.`
+    );
+    if (!confirmed) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/subjects/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || `Couldn't delete (server responded ${res.status}).`);
+        return;
+      }
+      const remaining = subjects.filter((s) => s.id !== id);
+      setSubjects(remaining);
+      if (target && target.code === selectedCode) {
+        setSelectedCode(remaining.length ? remaining[0].code : "");
+      }
+    } catch {
+      alert("Couldn't reach the backend — is it running?");
+    }
+  }
+
   return (
     <div className="page">
       <div className="hub-filter">
@@ -256,6 +374,11 @@ function ResourceHubPage({ user }) {
             placeholder="Search subjects by name or code…"
             onChange={(e) => setSearch(e.target.value)}
           />
+          {user?.role === "admin" && (
+            <button className="cat-add-btn" onClick={openAddSubjectModal}>
+              <span className="append-plus">+</span> Add New Subject
+            </button>
+          )}
           <div className="cat-list">
             {loadingSubjects ? (
               <div className="tab-empty">Loading subjects…</div>
@@ -299,6 +422,16 @@ function ResourceHubPage({ user }) {
               <div className="detail-top">
                 <span className="course-badge">Official GGSIPU Course: {selected.code}</span>
                 <span className="exam-weight">Exam Weightage: Continuous evaluation criteria applies</span>
+                {user?.role === "admin" && (
+                  <button
+                    className="subject-delete"
+                    onClick={() => handleDeleteSubject(selected.id)}
+                    title="Delete this subject"
+                  >
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+                    Delete Subject
+                  </button>
+                )}
               </div>
 
               <h2 className="detail-title">{selected.name}</h2>
@@ -454,6 +587,98 @@ function ResourceHubPage({ user }) {
                 <button className="modal-cancel" onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button className="modal-publish" onClick={handlePublish} disabled={submitting}>
                   <span className="append-plus">+</span> {submitting ? "Publishing..." : "Publish Material"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSubjModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsSubjModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-left">
+                <span className="modal-icon">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                </span>
+                <div>
+                  <div className="modal-title">Add New Subject</div>
+                  <div className="modal-sub">
+                    {branchNames[branch]} · Semester {semester} ·{" "}
+                    {yearSchemes.find((y) => y.id === yearScheme)?.label}
+                  </div>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setIsSubjModalOpen(false)} aria-label="Close">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="subj-form-row">
+                <div className="subj-form-col">
+                  <div className="modal-field-label">Subject Code</div>
+                  <input
+                    className="modal-input"
+                    type="text"
+                    value={subjCode}
+                    placeholder="e.g., ICT-201"
+                    onChange={(e) => setSubjCode(e.target.value)}
+                  />
+                </div>
+                <div className="subj-form-col subj-credits-col">
+                  <div className="modal-field-label">Credits</div>
+                  <select value={subjCredits} onChange={(e) => setSubjCredits(e.target.value)}>
+                    {["1", "2", "3", "4", "5", "6"].map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="modal-field-label">Subject Name</div>
+              <input
+                className="modal-input"
+                type="text"
+                value={subjName}
+                placeholder="e.g., Foundations of Computer Science"
+                onChange={(e) => setSubjName(e.target.value)}
+              />
+
+              <div className="modal-divider"></div>
+              <div className="modal-field-label">Syllabus Units — fill what you have, leave the rest blank</div>
+
+              {subjUnits.map((u, i) => {
+                const roman = ["I", "II", "III", "IV"][i];
+                return (
+                  <div className="unit-form" key={i}>
+                    <div className="unit-form-head">Unit {roman}</div>
+                    <input
+                      className="modal-input"
+                      type="text"
+                      value={u.title}
+                      placeholder={`Unit ${roman} title — e.g., Arrays & Stacks`}
+                      onChange={(e) => updateSubjUnit(i, "title", e.target.value)}
+                    />
+                    <textarea
+                      className="modal-textarea"
+                      value={u.desc}
+                      placeholder="What this unit covers…"
+                      onChange={(e) => updateSubjUnit(i, "desc", e.target.value)}
+                    />
+                  </div>
+                );
+              })}
+
+              {subjError && <p className="modal-error">{subjError}</p>}
+
+              <div className="modal-divider"></div>
+
+              <div className="modal-actions">
+                <button className="modal-cancel" onClick={() => setIsSubjModalOpen(false)}>Cancel</button>
+                <button className="modal-publish" onClick={handleAddSubject} disabled={subjSubmitting}>
+                  <span className="append-plus">+</span> {subjSubmitting ? "Adding..." : "Add Subject"}
                 </button>
               </div>
             </div>

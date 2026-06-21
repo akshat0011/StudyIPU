@@ -1410,3 +1410,68 @@ body * {
 }
 .contact-value { font-weight: 600; font-size: 0.95rem; }
 
+/* ===== Admin: manage subjects in the Resource Hub ===== */
+/* "Add New Subject" button under the catalog search */
+.cat-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 1rem;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  background-color: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.cat-add-btn:hover { background-color: var(--surface-2); }
+
+/* "Delete Subject" button in the detail header */
+.subject-delete {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background-color: var(--surface);
+  color: #ef4444;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.subject-delete:hover { background-color: #ef4444; color: #fff; border-color: #ef4444; }
+
+/* Add-subject modal: code + credits row and per-unit blocks */
+.subj-form-row { display: flex; gap: 1rem; }
+.subj-form-col { flex: 1; }
+.subj-credits-col { flex: 0 0 110px; }
+.subj-credits-col select { width: 100%; }
+.unit-form {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem 0.4rem;
+  margin-bottom: 1rem;
+  background-color: var(--surface-2);
+}
+.unit-form-head {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-bottom: 0.6rem;
+}
+.unit-form .modal-input,
+.unit-form .modal-textarea { margin-bottom: 0.7rem; }
+.unit-form .modal-textarea { min-height: 68px; }
+
