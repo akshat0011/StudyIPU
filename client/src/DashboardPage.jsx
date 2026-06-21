@@ -1,13 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
-
-const branches = [
-  { code: "CSE", name: "CSE - Computer Science & Engineering" },
-  { code: "IT", name: "IT - Information Technology" },
-  { code: "ECE", name: "ECE - Electronics & Communication" },
-  { code: "AIML", name: "AIML - AI & Machine Learning" },
-  { code: "AIDS", name: "AIDS - AI & Data Science" },
-];
+import { branches } from "./branches"; // CHANGED: shared list
 
 const semesters = [
   { value: "1", label: "Semester 1 (Odd)" },
@@ -51,7 +44,7 @@ function DashboardPage() {
             <label className="field-label">Select Engineering Branch</label>
             <select value={branch} onChange={(e) => setBranch(e.target.value)}>
               {branches.map((b) => (
-                <option key={b.code} value={b.code}>{b.name}</option>
+                <option key={b.code} value={b.code}>{b.code} – {b.name}</option>
               ))}
             </select>
           </div>

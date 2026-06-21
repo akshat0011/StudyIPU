@@ -1,15 +1,6 @@
 import { API_URL } from "./api";
 import { useState, useEffect } from "react";
-
-const branches = ["CSE", "IT", "ECE", "CSAI", "CSDS"];
-
-const branchNames = {
-  CSE: "Computer Science & Engineering",
-  IT: "Information Technology",
-  ECE: "Electronics & Communication",
-  CSAI: "CSE – Artificial Intelligence",
-  CSDS: "CSE – Data Science",
-};
+import { branchCodes as branches, branchNames } from "./branches"; // CHANGED: shared list
 
 const yearSchemes = [
   { id: "2024_and_after", label: "2024 & after" },

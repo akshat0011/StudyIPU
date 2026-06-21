@@ -1,8 +1,8 @@
 import { API_URL } from "./api";
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import { branchCodes as branches } from "./branches"; // CHANGED: shared list
 
-const branches = ["CSE", "IT", "ECE", "AIML", "AIDS"];
 const semesters = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
 function AITutorPage() {
