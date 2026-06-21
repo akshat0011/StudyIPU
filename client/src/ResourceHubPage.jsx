@@ -1,6 +1,7 @@
 import { API_URL } from "./api";
 import { useState, useEffect, useCallback } from "react";
 import { branchCodes as branches, branchNames } from "./branches"; // CHANGED: shared list
+import { yearSchemes } from "./schemes"; // CHANGED: shared list
 
 // A fresh set of 4 blank syllabus units for the add-subject form.
 const blankUnits = () => [
@@ -8,11 +9,6 @@ const blankUnits = () => [
   { title: "", desc: "" },
   { title: "", desc: "" },
   { title: "", desc: "" },
-];
-
-const yearSchemes = [
-  { id: "2024_and_after", label: "2024 & after" },
-  { id: "2023_and_before", label: "2023 & before" },
 ];
 
 const semesters = ["1", "2", "3", "4", "5", "6", "7", "8"];

@@ -2,10 +2,12 @@ import { API_URL } from "./api";
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { branchCodes as branches } from "./branches"; // CHANGED: shared list
+import { yearSchemes } from "./schemes"; // NEW: shared scheme list
 
 const semesters = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
 function AITutorPage() {
+  const [yearScheme, setYearScheme] = useState("2024_and_after"); // NEW
   const [branch, setBranch] = useState("CSE");
   const [semester, setSemester] = useState("3");
   const [messages, setMessages] = useState([]);
@@ -31,7 +33,7 @@ const messagesRef = useRef(null); // CHANGED
       const res = await fetch(API_URL + "/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, branch, semester }),
+        body: JSON.stringify({ messages: newMessages, branch, semester, year: yearScheme }), // CHANGED: send scheme
       });
       const data = await res.json();
       const reply = res.ok ? data.reply : data.error || "Something went wrong. Please try again.";
@@ -67,6 +69,14 @@ const messagesRef = useRef(null); // CHANGED
           </p>
 
           <div className="tutor-field">
+            <label className="field-label">Syllabus Scheme</label>
+            <select value={yearScheme} onChange={(e) => setYearScheme(e.target.value)}>
+              {yearSchemes.map((y) => (
+                <option key={y.id} value={y.id}>{y.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="tutor-field">
             <label className="field-label">USICT Branch</label>
             <select value={branch} onChange={(e) => setBranch(e.target.value)}>
               {branches.map((b) => (
@@ -88,6 +98,7 @@ const messagesRef = useRef(null); // CHANGED
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
               <span>Active Workspace</span>
             </div>
+            <div className="tutor-workspace-row">Scheme: <strong>{yearSchemes.find((y) => y.id === yearScheme)?.label}</strong></div>
             <div className="tutor-workspace-row">Branch: <strong>{branch}</strong></div>
             <div className="tutor-workspace-row">Semester: <strong>{String(semester).padStart(2, "0")}</strong></div>
             <button className="reset-thread-btn" onClick={resetThread}>
