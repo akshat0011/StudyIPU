@@ -1,6 +1,6 @@
 import { API_URL } from "./api";
 import { useState, useEffect, useCallback } from "react";
-import { branchCodes as branches, branchNames } from "./branches"; // CHANGED: shared list
+import { branchNames, branchCodesForScheme } from "./branches"; // CHANGED: scheme-aware list
 import { yearSchemes } from "./schemes"; // CHANGED: shared list
 
 // A fresh set of 4 blank syllabus units for the add-subject form.
@@ -438,7 +438,17 @@ function ResourceHubPage({ user }) {
       <div className="hub-filter">
         <div className="filter-group">
           <span className="filter-label">Syllabus Scheme</span>
-          <select value={yearScheme} onChange={(e) => setYearScheme(e.target.value)}>
+          <select
+            value={yearScheme}
+            onChange={(e) => {
+              const next = e.target.value;
+              setYearScheme(next);
+              // CSAI/CSDS don't exist before 2024 — if the current branch
+              // isn't offered in the new scheme, fall back to the first one.
+              const allowed = branchCodesForScheme(next);
+              if (!allowed.includes(branch)) setBranch(allowed[0]);
+            }}
+          >
             {yearSchemes.map((y) => (
               <option key={y.id} value={y.id}>{y.label}</option>
             ))}
@@ -450,7 +460,7 @@ function ResourceHubPage({ user }) {
         <div className="filter-group">
           <span className="filter-label">USICT Branch</span>
           <div className="branch-tabs">
-            {branches.map((b) => (
+            {branchCodesForScheme(yearScheme).map((b) => (
               <button
                 key={b}
                 className={b === branch ? "branch-tab active" : "branch-tab"}

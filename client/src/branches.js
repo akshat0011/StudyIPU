@@ -17,3 +17,15 @@ export const branchCodes = branches.map((b) => b.code);
 export const branchNames = Object.fromEntries(
   branches.map((b) => [b.code, b.name])
 );
+
+// CSAI and CSDS were introduced with the 2024 scheme, so they don't exist for
+// the "2023 & before" scheme.
+const branchesAddedIn2024 = ["CSAI", "CSDS"];
+
+// The branch codes available for a given syllabus scheme.
+export function branchCodesForScheme(yearScheme) {
+  if (yearScheme === "2023_and_before") {
+    return branchCodes.filter((code) => !branchesAddedIn2024.includes(code));
+  }
+  return branchCodes;
+}

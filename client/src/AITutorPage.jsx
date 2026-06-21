@@ -1,7 +1,7 @@
 import { API_URL } from "./api";
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { branchCodes as branches } from "./branches"; // CHANGED: shared list
+import { branchCodesForScheme } from "./branches"; // CHANGED: scheme-aware list
 import { yearSchemes } from "./schemes"; // NEW: shared scheme list
 
 const semesters = ["1", "2", "3", "4", "5", "6", "7", "8"];
@@ -70,7 +70,15 @@ const messagesRef = useRef(null); // CHANGED
 
           <div className="tutor-field">
             <label className="field-label">Syllabus Scheme</label>
-            <select value={yearScheme} onChange={(e) => setYearScheme(e.target.value)}>
+            <select
+              value={yearScheme}
+              onChange={(e) => {
+                const next = e.target.value;
+                setYearScheme(next);
+                const allowed = branchCodesForScheme(next);
+                if (!allowed.includes(branch)) setBranch(allowed[0]);
+              }}
+            >
               {yearSchemes.map((y) => (
                 <option key={y.id} value={y.id}>{y.label}</option>
               ))}
@@ -79,7 +87,7 @@ const messagesRef = useRef(null); // CHANGED
           <div className="tutor-field">
             <label className="field-label">USICT Branch</label>
             <select value={branch} onChange={(e) => setBranch(e.target.value)}>
-              {branches.map((b) => (
+              {branchCodesForScheme(yearScheme).map((b) => (
                 <option key={b} value={b}>{b}</option>
               ))}
             </select>
